@@ -18,8 +18,9 @@ case class StateT[M[_], S, A](run: S => M[(S, A)]) {
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    *
    */
-  def map[B](f: A => B)(implicit M: Monad[M]): StateT[M, S, B] =
-    ???
+  def map[B](f: A => B)(implicit M: Monad[M]): StateT[M, S, B] = StateT { st =>
+    M.map(run(st)){ case (sta, a) => (sta, f(a)) }
+  }
 
   /*
    * Exercise 7.2:
@@ -31,7 +32,9 @@ case class StateT[M[_], S, A](run: S => M[(S, A)]) {
    *
    */
   def flatMap[B](f: A => StateT[M, S, B])(implicit M: Monad[M]): StateT[M, S, B] =
-    ???
+    StateT { st =>
+      M.bind(run(st)){ case (sta, a) => f(a).run(sta) }
+    }
 }
 
 object StateT {
@@ -42,8 +45,9 @@ object StateT {
    *
    * Hint: Try using StateT constructor.
    */
-  def value[M[_]: Monad, S, A](a: => A): StateT[M, S, A] =
-    ???
+  def value[M[_]: Monad, S, A](a: => A): StateT[M, S, A] = StateT { st =>
+    Monad[M].pure((st, a))
+  }
 
   /*
    * Exercise 7.4:
@@ -54,8 +58,9 @@ object StateT {
    *
    * Hint: Try using StateT constructor.
    */
-  def get[M[_]: Monad, S]: StateT[M, S, S] =
-    ???
+  def get[M[_]: Monad, S]: StateT[M, S, S] = StateT { st =>
+    Monad[M].pure((st, st))
+  }
 
   /*
    * Exercise 7.5:
@@ -66,8 +71,10 @@ object StateT {
    *
    * Hint: Try building on get.
    */
-  def gets[M[_]: Monad, S, A](f: S => A): StateT[M, S, A] =
-    ???
+  def gets[M[_]: Monad, S, A](f: S => A): StateT[M, S, A] = StateT { st =>
+      Monad[M].pure((st, f(st)))
+    }
+    //get map f
 
   /*
    * Exercise 7.6:
@@ -78,8 +85,9 @@ object StateT {
    *
    * Hint: Try using State constructor.
    */
-  def modify[M[_]: Monad, S](f: S => S): StateT[M, S, Unit] =
-    ???
+  def modify[M[_]: Monad, S](f: S => S): StateT[M, S, Unit] = StateT { st =>
+      Monad[M].pure((f(st), ()))
+    }
 
   /*
    * Exercise 7.7:
@@ -90,8 +98,10 @@ object StateT {
    *
    * Hint: Try building on modify.
    */
-  def put[M[_]: Monad, S](s: S): StateT[M, S, Unit] =
-    ???
+  def put[M[_]: Monad, S](s: S): StateT[M, S, Unit] = StateT { _ =>
+      Monad[M].pure((s, ()))
+    }
+    //modify{ _ => s }
 
   class StateT_[F[_], S] {
     type l[a] = StateT[F, S, a]
@@ -114,6 +124,8 @@ object StateT {
    *
    * Hint: Try using StateT constructor and Monad[M].map(ga).
    */
-  implicit def StateTMonadTrans[S]: MonadTrans[StateT__[S]#l] =
-    ???
+  implicit def StateTMonadTrans[S]: MonadTrans[StateT__[S]#l] = new MonadTrans[StateT__[S]#l] {
+    def liftM[M[_]: Monad, A](ga: M[A]): StateT[M, S, A] =
+      StateT{ st => Monad[M].map(ga)(a => (st, a)) }
+  }
 }

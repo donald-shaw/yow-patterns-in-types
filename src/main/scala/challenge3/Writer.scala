@@ -21,8 +21,7 @@ case class Writer[W, A](log: W, value: A) {
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    *
    */
-  def map[B](f: A => B): Writer[W, B] =
-    ???
+  def map[B](f: A => B): Writer[W, B] = Writer(log, f(value))
 
   /*
    * Exercise 3.2:
@@ -33,8 +32,10 @@ case class Writer[W, A](log: W, value: A) {
    *   r.flatMap(f).flatMap(g) == r.flatMap(z => f(z).flatMap(g))
    *
    */
-  def flatMap[B](f: A => Writer[W, B])(implicit M: Monoid[W]): Writer[W, B] =
-    ???
+  def flatMap[B](f: A => Writer[W, B])(implicit M: Monoid[W]): Writer[W, B] = {
+    val w = f(value)
+    Writer(log |+| w.log, w.value)
+  }
 }
 
 object Writer {
@@ -46,8 +47,7 @@ object Writer {
    *
    * Hint: Try using Writer constructor.
    */
-  def value[W: Monoid, A](a: A): Writer[W, A] =
-    ???
+  def value[W: Monoid, A](a: A): Writer[W, A] = Writer(Monoid[W].zero, a)
 
   /*
    * Exercise 3.4:
@@ -58,16 +58,17 @@ object Writer {
    *
    * Hint: Try using Writer constructor.
    */
-  def tell[W](w: W): Writer[W, Unit] =
-    ???
+  def tell[W](w: W): Writer[W, Unit] = Writer(w, ())
 
   /*
    * Exercise 3.5:
    *
    * Sequence, a list of Readers, to a Reader of Lists.
    */
-  def sequence[W: Monoid, A](writers: List[Writer[W, A]]): Writer[W, List[A]] =
-    ???
+  def sequence[W: Monoid, A](writers: List[Writer[W, A]]): Writer[W, List[A]] = {
+    val logs = writers.map(_.log).foldLeft(Monoid[W].zero)(_ |+| _)
+    Writer(logs, writers.map(_.value))
+  }
 
   class Writer_[W] {
     type l[a] = Writer[W, a]
@@ -110,16 +111,38 @@ object Writer {
  * fill in the remainder, to complete the spec.
  */
 object Example {
+  import Writer._
+
   case class Stats(min: Int, max: Int, total: Int, count: Int)
   case class Stock(ticker: String, date: String, cents: Int)
+
+  def genStats(stocks: List[Stock]): Stats =
+    stocks.map(_.cents).foldLeft(Monoid[Stats].zero)((st, c) => st |+| Stats(c,c,c,1))
+
+  def bumpLarge(stocks: List[Stock]): Writer[List[Stats], List[Stock]] = {
+    val sts = stocks.map(st => if (st.cents < 10000) st else st.copy(cents = st.cents + 10))
+    Writer(List(genStats(sts)), sts)
+  }
+
+  def bumpSmall(stocks: List[Stock]): Writer[List[Stats], List[Stock]] = {
+      val sts = stocks.map(st => if (st.cents < 10000) st.copy(cents = st.cents + 1000) else st)
+      Writer(List(genStats(sts)), sts)
+    }
 
   /**
    * Implement our algorthim.
    *
    * Hint: Writer(W, A) and Writer.sequence will be useful here.
    */
-  def stocks(data: List[Stock]): (Stats, List[Stock]) =
-    ???
+  def stocks(data: List[Stock]): (Stats, List[Stock]) = {
+    val w = for {
+      init <- Writer(List(genStats(data)), data)
+      w1 <- bumpLarge(init)
+      w2 <- bumpSmall(w1)
+    } yield w2
+
+    (w.log.last, w.value)
+  }
 
   /**
    * A monoid for Stats.
@@ -127,9 +150,11 @@ object Example {
   implicit def StatsMonoid: Monoid[Stats] =
     new Monoid[Stats] {
       def zero =
-        ???
-      def append(l: Stats, r: => Stats) =
-        ???
+        Stats(Int.MaxValue,0,0,0)
+      def append(l: Stats, r: => Stats) = {
+        val Stats(min, max, total, count) = r
+        Stats(Math.min(l.min, min), Math.max(l.max, max), l.total + total, l.count + count)
+      }
     }
 
   def exampledata = List(

@@ -18,8 +18,10 @@ case class WriterT[M[_], W, A](run: M[(W, A)]) {
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    *
    */
-  def map[B](f: A => B)(implicit W: Monoid[W], M: Monad[M]): WriterT[M, W, B] =
-    ???
+  def map[B](f: A => B)(implicit W: Monoid[W], M: Monad[M]): WriterT[M, W, B] = WriterT {
+    //flatMap(a => WriterT.value(f(a)))
+    M.map(run){ case (w, a) => (w, f(a)) }
+  }
 
   /*
    * Exercise 6.2:
@@ -30,8 +32,17 @@ case class WriterT[M[_], W, A](run: M[(W, A)]) {
    *   r.flatMap(f).flatMap(g) == r.flatMap(z => f(z).flatMap(g))
    *
    */
-  def flatMap[B](f: A => WriterT[M, W, B])(implicit W: Monoid[W], M: Monad[M]): WriterT[M, W, B] =
-    ???
+  def flatMap[B](f: A => WriterT[M, W, B])(implicit W: Monoid[W], M: Monad[M]): WriterT[M, W, B] = WriterT {
+//    for {
+//      (wa, a) <- run
+//      (wb, b) <- f(a).run
+//    } yield (wa |+| wb, b)
+    M.bind(run){ case (wa, a) =>
+      M.map(f(a).run){ case (wb, b) =>
+        (wa |+| wb, b)
+      }
+    }
+  }
 }
 
 object WriterT {
@@ -43,7 +54,7 @@ object WriterT {
    *
    */
   def writer[M[_]: Monad, W, A](a: A)(w: W): WriterT[M, W, A] =
-    ???
+    WriterT(Monad[M].pure((w, a)))
 
   /*
    * Exercise 6.4:
@@ -52,7 +63,7 @@ object WriterT {
    * Monoid for W.
    */
   def value[M[_]: Monad, W: Monoid, A](a: => A): WriterT[M, W, A] =
-    ???
+    WriterT(Monad[M].pure((Monoid[W].zero, a)))
 
   /*
    * Exercise 6.5:
@@ -62,7 +73,8 @@ object WriterT {
    * Tell appends the writer content w and produces no value.
    */
   def tell[M[_]: Monad, W](w: W): WriterT[M, W, Unit] =
-    ???
+    //writer[M, W, Unit](())(w)
+    WriterT(Monad[M].pure((w, ())))
 
 
   class WriterT_[M[_], W] {
@@ -89,6 +101,8 @@ object WriterT {
    *
    * Hint: Try using WriterT constructor and Monad[M].map(ga).
    */
-  implicit def WriterTMonadTrans[W:Monoid]: MonadTrans[WriterT__[W]#l] =
-    ???
+  implicit def WriterTMonadTrans[W:Monoid]: MonadTrans[WriterT__[W]#l] = new MonadTrans[WriterT__[W]#l] {
+    def liftM[M[_]: Monad, A](ga: M[A]): WriterT[M, W, A] =
+      WriterT(Monad[M].map(ga)(a => (Monoid[W].zero, a)))
+  }
 }

@@ -81,7 +81,11 @@ object Warmup {
    * resX: List[Int] = List(1, 2, 3, 4, 5, 6, 7, 8)
    */
   def append[A](x: List[A], y: List[A]): List[A] =
-    ???
+    x.foldRight(y)((h, acc) => h :: acc)
+//    x match {
+//      case Nil => y
+//      case h :: t => h :: append(t, y)
+//    }
 
   /*
    * Exercise: 0.2:
@@ -100,7 +104,11 @@ object Warmup {
    *     not infer what you mean.
    */
   def map[A, B](xs: List[A])(f: A => B): List[B] =
-    ???
+    xs.foldRight(List[B]())((h, acc) => f(h) :: acc)
+//    xs match {
+//      case Nil => Nil
+//      case h :: t => f(h) :: map(t)(f)
+//    }
 
   /*
    * Exercise: 0.3:
@@ -112,7 +120,12 @@ object Warmup {
    * resX: List[Int] = List(1, 2)
    */
   def filter[A](xs: List[A])(p: A => Boolean): List[A] =
-    ???
+    xs.foldRight(List[A]())((h, acc) => if (p(h)) h :: acc else acc)
+//    xs match {
+//      case Nil => Nil
+//      case h :: t if p(h) => h :: filter(t)(p)
+//      case h :: t => filter(t)(p)
+//    }
 
   /*
    * Exercise: 0.4:
@@ -130,8 +143,17 @@ object Warmup {
    *     Type annotations are required when scala can
    *     not infer what you mean.
    */
-  def reverse[A](xs: List[A]): List[A] =
-    ???
+  def reverse[A](xs: List[A]): List[A] = {
+//    xs.foldLeft(List[A]())((acc, h) => h :: acc)
+//    xs.foldRight(List[A]())((h, acc) => append(acc, h :: Nil))
+    def loop(ys: List[A], acc: List[A]): List[A] =
+      ys match {
+        case Nil => acc
+        case h :: t => loop(t, h :: acc)
+      }
+
+    loop(xs, Nil)
+  }
 
   /*
    * *Challenge* Exercise: 0.5:
@@ -145,6 +167,15 @@ object Warmup {
    * ~~~ library hint: use can just use List[A]#sorted to sort the list before you start.
    * ~~~ library hint: List[A]#min and List#max exist.
    */
-  def ranges(xs: List[Int]): List[(Int, Int)] =
-    ???
+  def ranges(xs: List[Int]): List[(Int, Int)] = {
+    def loop(ys: List[Int], acc: List[(Int, Int)]): List[(Int, Int)] =
+      (ys, acc) match {
+        case (Nil, _) => acc
+        case (h :: t, Nil) => loop(t, List((h, h)))
+        case (h :: t, ah :: at) if (h == ah._2 + 1) => loop (t, (ah._1, h) :: at)
+        case (h :: t, ah :: at) => loop (t, (h, h) :: acc)
+      }
+
+    loop(xs.distinct.sorted, Nil).reverse
+  }
 }

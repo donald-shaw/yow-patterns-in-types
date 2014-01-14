@@ -29,8 +29,11 @@ case class Http[A](run: (HttpRead, HttpState) => (HttpWrite, HttpState, HttpValu
    *   r.flatMap(f).flatMap(g) == r.flatMap(z => f(z).flatMap(g))
    *
    */
-  def flatMap[B](f: A => Http[B]): Http[B] =
-    ???
+  def flatMap[B](f: A => Http[B]): Http[B] = ???
+//    Http { (r, st) =>
+//      val (w, stt, va) = run(r, st)
+//      va.flatMap(a => f(a).run(r, stt))
+//    }
 }
 
 object Http {
@@ -42,7 +45,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def value[A](a: => A): Http[A] =
-    ???
+    Http((r,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(a)))
 
   /*
    * Exercise 8a.4:
@@ -52,7 +55,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def httpAsk: Http[HttpRead] =
-    ???
+    Http((r,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(r)))
 
   /*
    * Exercise 8a.5:
@@ -62,7 +65,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def httpGet: Http[HttpState] =
-    ???
+    Http((r,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(st)))
 
   /*
    * Exercise 8a.6:
@@ -72,7 +75,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def httpModify(f: HttpState => HttpState): Http[Unit] =
-    ???
+    Http((r,st) => (Monoid[HttpWrite].zero, f(st), HttpValue.ok(())))
 
   /*
    * Exercise 8a.7:
