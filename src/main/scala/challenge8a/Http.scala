@@ -18,7 +18,7 @@ case class Http[A](run: (HttpRead, HttpState) => (HttpWrite, HttpState, HttpValu
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    */
   def map[B](f: A => B): Http[B] =
-    ???
+    //flatMap{ run(r, st) }
 
   /*
    * Exercise 8a.2:
@@ -29,11 +29,11 @@ case class Http[A](run: (HttpRead, HttpState) => (HttpWrite, HttpState, HttpValu
    *   r.flatMap(f).flatMap(g) == r.flatMap(z => f(z).flatMap(g))
    *
    */
-  def flatMap[B](f: A => Http[B]): Http[B] = ???
-//    Http { (r, st) =>
-//      val (w, stt, va) = run(r, st)
-//      va.flatMap(a => f(a).run(r, stt))
-//    }
+  def flatMap[B](f: A => Http[B]): Http[B] =
+    Http { (r, st) =>
+      val (w, stt, va) = run(r, st)
+      (w, stt, va.flatMap(a => f(a).run(r, stt)._3))
+    }
 }
 
 object Http {
@@ -46,6 +46,7 @@ object Http {
    */
   def value[A](a: => A): Http[A] =
     Http((r,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(a)))
+    //Http((r, s) => (HttpWrite(Vector()), s, HttpValue.ok(a))) // answer - same? monoid-zero for HttpWrite _is_ just HttpWrite(Vector()) - see below
 
   /*
    * Exercise 8a.4:
@@ -65,7 +66,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def httpGet: Http[HttpState] =
-    Http((r,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(st)))
+    Http((_,st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(st)))
 
   /*
    * Exercise 8a.6:
@@ -75,7 +76,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def httpModify(f: HttpState => HttpState): Http[Unit] =
-    Http((r,st) => (Monoid[HttpWrite].zero, f(st), HttpValue.ok(())))
+    Http((_,st) => (Monoid[HttpWrite].zero, f(st), HttpValue.ok(())))
 
   /*
    * Exercise 8a.7:
@@ -97,7 +98,7 @@ object Http {
    *       that have not been specified yet, remember exercise 4 update?
    */
   def addHeader(name: String, value: String): Http[Unit] =
-    ???
+    httpModify(s => HttpState(s.resheaders.:+((name, value))))
 
   /*
    * Exercise 8a.9:
@@ -107,7 +108,7 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def log(message: String): Http[Unit] =
-    ???
+    Http((_,st) => (HttpWrite(Vector(message)), st, HttpValue.ok(())))
 
   implicit def HttpMonad: Monad[Http] =
     new Monad[Http] {
