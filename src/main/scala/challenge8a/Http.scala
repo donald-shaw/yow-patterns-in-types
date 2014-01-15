@@ -30,9 +30,15 @@ case class Http[A](run: (HttpRead, HttpState) => (HttpWrite, HttpState, HttpValu
    *
    */
   def flatMap[B](f: A => Http[B]): Http[B] =
-    Http { (r, st) =>
-      val (w, stt, va) = run(r, st)
-      (w, stt, va.flatMap(a => f(a).run(r, stt)._3))
+    Http { (r, s0) =>
+      val (w1, s1, va) = run(r, s0)
+      va match {
+        case Explosion(ex) => (w1, s1, HttpValue.explosion(ex))
+        case Fail(msg) => (w1, s1, HttpValue.fail(msg))
+        case Ok(a1) => f(a1).run(r, s1) match {
+          case (w2, s2, a2) => (w1 ++ w2, s2, a2)
+        }
+      }
     }
 }
 
@@ -87,7 +93,8 @@ object Http {
    *       that have not been specified yet, remember exercise 2 ask?
    */
   def getBody: Http[String] =
-    Http ((r, st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(r.body)))
+    httpAsk map (_.body)
+    //Http ((r, st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(r.body)))
 
   /*
    * Exercise 8a.8:
@@ -98,7 +105,8 @@ object Http {
    *       that have not been specified yet, remember exercise 4 update?
    */
   def addHeader(name: String, value: String): Http[Unit] =
-    httpModify(s => HttpState(s.resheaders.:+((name, value))))
+    httpModify(s => s.copy(resheaders = s.resheaders :+ (name -> value)))
+    //httpModify(s => HttpState(s.resheaders.:+((name, value))))
 
   /*
    * Exercise 8a.9:
@@ -132,13 +140,18 @@ object HttpExample {
    *
    * Hint: Try using flatMap or for comprehensions.
    */
-  def echo: Http[String] =
-    //for
-    {
-      val header = addHeader("content-type", "text/plain")
-      //va <- header.map("foo")
-      header.flatMap(_ => getBody).flatMap(body => log(body.length.toString).map(_ => body))
-    } //yield header
+  def echo: Http[String] = for {
+    body <- getBody
+    _ <- addHeader("content-type", "text/plain")
+    _ <- log("length was: " + body.length)
+  } yield body
+//    //for
+//    {
+//      val header = addHeader("content-type", "text/plain")
+//      //va <- header.map("foo")
+//      header.flatMap(_ => getBody).flatMap(body => log(body.length.toString).map(_ => body))
+//    } //yield header
+
 }
 
 
