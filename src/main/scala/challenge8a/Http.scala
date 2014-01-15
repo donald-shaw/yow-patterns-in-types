@@ -18,7 +18,7 @@ case class Http[A](run: (HttpRead, HttpState) => (HttpWrite, HttpState, HttpValu
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    */
   def map[B](f: A => B): Http[B] =
-    //flatMap{ run(r, st) }
+    flatMap(a => Http.value(f(a)))
 
   /*
    * Exercise 8a.2:
@@ -87,7 +87,7 @@ object Http {
    *       that have not been specified yet, remember exercise 2 ask?
    */
   def getBody: Http[String] =
-    ???
+    Http ((r, st) => (Monoid[HttpWrite].zero, st, HttpValue.ok(r.body)))
 
   /*
    * Exercise 8a.8:
@@ -133,7 +133,12 @@ object HttpExample {
    * Hint: Try using flatMap or for comprehensions.
    */
   def echo: Http[String] =
-    ???
+    //for
+    {
+      val header = addHeader("content-type", "text/plain")
+      //va <- header.map("foo")
+      header.flatMap(_ => getBody).flatMap(body => log(body.length.toString).map(_ => body))
+    } //yield header
 }
 
 
