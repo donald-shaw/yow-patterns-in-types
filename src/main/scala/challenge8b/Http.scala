@@ -34,7 +34,8 @@ case class Http[A](run: RWSV[A]) {
    *  2) r.map(z => f(g(z))) == r.map(g).map(f)
    */
   def map[B](f: A => B): Http[B] =
-    ???
+    Http(run.map(f))
+    //flatMap(a => Http.value(f(a)))
 
   /*
    * Exercise 8b.2:
@@ -46,7 +47,7 @@ case class Http[A](run: RWSV[A]) {
    *
    */
   def flatMap[B](f: A => Http[B]): Http[B] =
-    ???
+    Http(run.flatMap(f andThen (_.run)))
 }
 
 object Http {
@@ -63,7 +64,11 @@ object Http {
    * Hint: Try using Http constructor.
    */
   def value[A](a: => A): Http[A] =
-    ???
+    Http(Monad[RWSV].point(a))
+//    Http(
+//      liftM[R_, WSV, A](
+//        liftM[W_, SV, A](
+//          StateT.value[V, HttpState, A](a))))
 
   /*
    * Exercise 8b.4:
@@ -73,7 +78,7 @@ object Http {
    * Hint: Try using Http constructor and ReaderT ask.
    */
   def httpAsk: Http[HttpRead] =
-    ???
+    Http(ReaderT.ask[WSV, HttpRead])
 
   /*
    * Exercise 8b.5:
@@ -117,7 +122,10 @@ object Http {
    *     liftM[W_, SV, Unit](???): WSV[Unit]
    */
   def httpModify(f: HttpState => HttpState): Http[Unit] =
-    ???
+    Http(
+      liftM[R_, WSV, Unit](
+        liftM[W_, SV, Unit](
+          modify[V, HttpState](f))))
 
   /*
    * Exercise 8b.7:
@@ -209,6 +217,10 @@ object HttpWrite {
 case class Headers(headers: Vector[(String, String)]) {
   def :+(p: (String, String)) =
     Headers(headers :+ p)
+}
+
+object Headers {
+  def apply(): Headers = Headers(Vector())
 }
 
 /** Method data type. */

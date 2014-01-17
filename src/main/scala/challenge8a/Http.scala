@@ -145,13 +145,6 @@ object HttpExample {
     _ <- addHeader("content-type", "text/plain")
     _ <- log("length was: " + body.length)
   } yield body
-//    //for
-//    {
-//      val header = addHeader("content-type", "text/plain")
-//      //va <- header.map("foo")
-//      header.flatMap(_ => getBody).flatMap(body => log(body.length.toString).map(_ => body))
-//    } //yield header
-
 }
 
 
