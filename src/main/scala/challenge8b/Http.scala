@@ -48,6 +48,19 @@ case class Http[A](run: RWSV[A]) {
    */
   def flatMap[B](f: A => Http[B]): Http[B] =
     Http(run.flatMap(f andThen (_.run)))
+
+  type Result = (HttpWrite, HttpState, HttpValue[A])
+  def apply(read: HttpRead, state: HttpState): Result = {
+
+    def error(thr: Throwable): Result = (HttpWrite(Vector(s"error: ${thr.getMessage}")), state, HttpValue.explosion(thr))
+    def failure(mssg: String): Result = (HttpWrite(Vector(s"failure: $mssg")), state, HttpValue.fail(mssg))
+
+    val r0: HttpTransformerStack.RWSV[A] = run
+    val r1: HttpTransformerStack.WSV[A] = r0.run(read)
+    val r2: HttpTransformerStack.SV[(HttpWrite, A)] = r1.run
+    val r3: HttpTransformerStack.V[(HttpState, (HttpWrite, A))] = r2.run(state)
+    r3.fold[Result](error, failure, { case (s: HttpState, (w: HttpWrite, a: A)) => (w, s, HttpValue.ok(a)) })
+  }
 }
 
 object Http {
@@ -78,7 +91,7 @@ object Http {
    * Hint: Try using Http constructor and ReaderT ask.
    */
   def httpAsk: Http[HttpRead] =
-    Http(ReaderT.ask[WSV, HttpRead])
+    Http(ReaderT.ask[WSV, HttpRead]) // 'ReaderT.' can be dropped - but only b/c ReaderT.ask is specifically imported above
 
   /*
    * Exercise 8b.5:
@@ -100,9 +113,9 @@ object Http {
   def httpGet: Http[HttpState] =
     /** FREE ANSWER, so you don't get too hung up on syntax, next one is for you */
     Http(
-      liftM[R_, WSV, HttpState](
+      liftM[R_, WSV, HttpState]( // NB: liftM imported ferom MonadTrans above.
         liftM[W_, SV, HttpState](
-          get[V, HttpState])))
+          StateT.get[V, HttpState] ) ) ) // 'StateT.' can be dropped - but only b/c StateT.get is specifically imported above
 
   /*
    * Exercise 8b.6:
@@ -125,7 +138,7 @@ object Http {
     Http(
       liftM[R_, WSV, Unit](
         liftM[W_, SV, Unit](
-          modify[V, HttpState](f))))
+          StateT.modify[V, HttpState](f) ) ) ) // 'StateT.' can be dropped - but only b/c StateT.modify is specifically imported above
 
   /*
    * Exercise 8b.7:
@@ -135,7 +148,9 @@ object Http {
    * Hint: Try using Http constructor, HttpWriteT tell MonadTrans.liftM (once).
    */
   def httpTell(w: HttpWrite): Http[Unit] =
-    ???
+    Http(
+      liftM[R_, WSV, Unit](
+        WriterT.tell[SV, HttpWrite](w) ) ) // 'WriterT.' can be dropped - but only b/c WriterT.tell is specifically imported above
 
   /*
    * Exercise 8b.8:
@@ -145,7 +160,7 @@ object Http {
    * Hint: You may want to use httpAsk.
    */
   def getBody: Http[String] =
-    ???
+    httpAsk map (_.body)
 
   /*
    * Exercise 8b.9:
@@ -155,7 +170,7 @@ object Http {
    * Hint: You may want to use httpModify.
    */
   def addHeader(name: String, value: String): Http[Unit] =
-    ???
+    httpModify(s => s.copy(resheaders = s.resheaders :+ (name -> value)))
 
   /*
    * Exercise 8b.10:
@@ -165,7 +180,7 @@ object Http {
    * Hint: Try using httpTell.
    */
   def log(message: String): Http[Unit] =
-    ???
+    httpTell(HttpWrite(Vector(message)))
 
   implicit def HttpMonad: Monad[Http] =
     new Monad[Http] {
@@ -177,7 +192,7 @@ object Http {
 object HttpExample {
   import Http._
 
- /*
+  /*
    * Exercise 8a.11:
    *
    * Implement echo http service.
@@ -189,8 +204,11 @@ object HttpExample {
    *
    * Hint: Try using flatMap or for comprehensions.
    */
-  def echo: Http[String] =
-    ???
+  def echo: Http[String] = for {
+    body <- getBody
+    _ <- addHeader("content-type", "text/plain")
+    _ <- log("length was: " + body.length)
+  } yield body
 }
 
 /** Data type wrapping up all http state data */
